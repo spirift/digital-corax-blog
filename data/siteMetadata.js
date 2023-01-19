@@ -13,7 +13,7 @@ const siteMetadata = {
   // email: 'address@yoursite.com',
   github: 'https://github.com/spirift',
   // twitter: 'https://twitter.com/Twitter',
-  // facebook: 'https://facebook.com',
+  stackoverflow: 'https://stackoverflow.com/users/2907606/spirift',
   // youtube: 'https://youtube.com',
   linkedin: 'https://www.linkedin.com/in/michael-burson-he-him-a7a87222/',
   locale: 'en-GB',
@@ -36,7 +36,7 @@ const siteMetadata = {
     // content security policy in the `next.config.js` file.
     // Select a provider and use the environment variables associated to it
     // https://vercel.com/docs/environment-variables
-    provider: 'giscus', // supported providers: giscus, utterances, disqus
+    provider: '', // supported providers: giscus, utterances, disqus
     giscusConfig: {
       // Visit the link below, and follow the steps in the 'configuration' section
       // https://giscus.app/
