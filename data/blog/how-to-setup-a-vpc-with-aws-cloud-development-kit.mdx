@@ -20,7 +20,7 @@ images: []
 layout: PostLayout
 ---
 
-If you're building with AWS, chances are you're gonna need a VPC. The Virtual Private Cloud
+If you’re building with AWS, chances are you’re gonna need a VPC. The Virtual Private Cloud
 (VPC) is an essential piece of infrastructure for almost any application. A VPC allows you
 to keep databases highly secure and have different (micro) services talk to each other without
 general Internet access.
@@ -29,7 +29,7 @@ Setting up a VPC with the AWS cloud development kit (CDK) is very simple but, it
 getting all the details right for different types of subnets, network ACL, ingress and egress rule.
 In this post we’ll go over some of the options.
 
-Assuming you have a typescript CDK project already set up (see the post about just this here)
+Assuming you have a typescript CDK project already set up
 all we need to do is import the EC2 library and use the Vpc construct.
 
 ```typescript
@@ -45,16 +45,16 @@ export class MyAppVpcStack extends cdk.Stack {
 }
 ```
 
-This is all that is required to make a new VPC but, in order to get the most out of our VPC we'll
-want to define a few subnets within the VPC for use later. We'll create a public subnet for things
+This is all that is _required_ to make a new VPC but, in order to get the most out of our VPC we’ll
+want to define a few subnets within the VPC for use later. We’ll create a public subnet for things
 like load balancers that will accept incoming connections from the internet. A private subnet for
 services that need to access the internet but will not allow any incoming connections from the internet.
 Last of all an isolated subnet for things that are completely cut off from the internet and can only be
 accessed from within the private subnet.
 
-Here's what the CDK code for that looks like. The CIDR mask defines how many IP addresses are available
-within that subnet, I.E how many services you can have within that subnet. More info on CIDR can be
-found here, for now it's not too important so don’t stress over it.
+Here’s what the CDK code for that looks like. The CIDR mask defines how many IP addresses are available
+within that subnet, I.E how many services run in the subnet. More info on CIDR can be
+found [here](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing), for now it’s not too important so don’t stress over it.
 
 ```typescript
 const vpc = new ec2.Vpc(this, 'MyApp-Vpc', {
@@ -89,7 +89,7 @@ const isolatedSubnets = vpc.selectSubnets({
 })
 ```
 
-Each of these subnets comes with a default network ACL (Access Control List) that allow internet
+Each of these subnets comes with a default network ACL (Access Control List) that allow all internet
 traffic. We want to use a custom network ACL for our isolated subnet to ensure it can only be accessed
 from our private subnet. This is done in CDK like so.
 
@@ -125,7 +125,7 @@ privateSubnets.subnets.forEach((subnet, index) => {
 
 There are a few more params we want to specify on the main VPC construct to get everything setup
 correctly. We will need a NAT gateway that manages access to the internet for the VPC. Bear in
-mind this has a cost of $40 a month. We'll also set up a CIDR range for the VPC and give it two
+mind this has a cost of $40 a month. We’ll also set up a CIDR range for the VPC and give it two
 availability zones for redundancy in case one zone goes down.
 
 ```typescript
@@ -137,7 +137,7 @@ const vpc = new ec2.Vpc(this, 'MyApp-Vpc', {
 })
 ```
 
-The last thing that we want to do is output the Vpc ID and CIDR to cloudformation and store it in the
+The last thing that we want to do is output the Vpc ID and CIDR block to Cloud Formation as well as storing them in the
 Systems Manager parameter store for easy access later.
 
 ```typescript
