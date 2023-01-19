@@ -1,0 +1,266 @@
+---
+title: How to setup a VPC with AWS CDK
+date: '2023-01-17'
+tags:
+  [
+    'aws',
+    'cdk',
+    'typescript',
+    'vpc',
+    'network',
+    'ssm',
+    'subnet',
+    'security',
+    'ACL',
+    'cloudformation',
+  ]
+draft: false
+summary: In this post we will go over some of the options available with a VPC and why you want to set them up in this way. By the end you will know how to create a new VPC use CDK for use in your applications.
+images: []
+layout: PostLayout
+---
+
+If you're building with AWS, chances are you're gonna need a VPC. The Virtual Private Cloud
+(VPC) is an essential piece of infrastructure for almost any application. A VPC allows you
+to keep databases highly secure and have different (micro) services talk to each other without
+general Internet access.
+
+Setting up a VPC with the AWS cloud development kit (CDK) is very simple but, it can get complicated
+getting all the details right for different types of subnets, network ACL, ingress and egress rule.
+In this post we’ll go over some of the options.
+
+Assuming you have a typescript CDK project already set up (see the post about just this here)
+all we need to do is import the EC2 library and use the Vpc construct.
+
+```typescript
+import * as cdk from 'aws-cdk-lib'
+import * as ec2 from '@aws-cdk/aws-ec2'
+
+export class MyAppVpcStack extends cdk.Stack {
+  constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
+    super(scope, id, props)
+
+    const vpc = new ec2.Vpc(this, 'MyApp-Vpc')
+  }
+}
+```
+
+This is all that is required to make a new VPC but, in order to get the most out of our VPC we'll
+want to define a few subnets within the VPC for use later. We'll create a public subnet for things
+like load balancers that will accept incoming connections from the internet. A private subnet for
+services that need to access the internet but will not allow any incoming connections from the internet.
+Last of all an isolated subnet for things that are completely cut off from the internet and can only be
+accessed from within the private subnet.
+
+Here's what the CDK code for that looks like. The CIDR mask defines how many IP addresses are available
+within that subnet, I.E how many services you can have within that subnet. More info on CIDR can be
+found here, for now it's not too important so don’t stress over it.
+
+```typescript
+const vpc = new ec2.Vpc(this, 'MyApp-Vpc', {
+  subnetConfiguration: [
+    {
+      cidrMask: 24,
+      name: 'Isolated',
+      subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+    },
+    {
+      cidrMask: 24,
+      name: 'Private',
+      subnetType: ec2.SubnetType.PRIVATE_WITH_NAT,
+    },
+    {
+      cidrMask: 28,
+      name: 'Public',
+      subnetType: ec2.SubnetType.PUBLIC,
+    },
+  ],
+})
+const privateSubnets = vpc.selectSubnets({
+  subnetType: ec2.SubnetType.PRIVATE_WITH_NAT,
+})
+
+const publicSubnets = vpc.selectSubnets({
+  subnetType: ec2.SubnetType.PUBLIC,
+})
+
+const isolatedSubnets = vpc.selectSubnets({
+  subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+})
+```
+
+Each of these subnets comes with a default network ACL (Access Control List) that allow internet
+traffic. We want to use a custom network ACL for our isolated subnet to ensure it can only be accessed
+from our private subnet. This is done in CDK like so.
+
+```typescript
+const nacl = new ec2.NetworkAcl(this, 'MyApp-NetworkAcl', {
+  vpc,
+  networkAclName: 'IsolatedSubnetNACL',
+  subnetSelection: isolatedSubnets,
+})
+```
+
+Now that the network ACL is set up we just need to add ingress and egress rules to allow access
+from the private subnet. Even though we only have one private subnet, when we select it the returned
+value is an array so we need to use a forEach to get the individual subnet.
+
+```typescript
+privateSubnets.subnets.forEach((subnet, index) => {
+  nacl.addEntry(`PrivateSubnets${index}Ingress`, {
+    cidr: ec2.AclCidr.ipv4(subnet.ipv4CidrBlock),
+    direction: ec2.TrafficDirection.INGRESS,
+    ruleNumber: 100 + index,
+    traffic: ec2.AclTraffic.allTraffic(),
+  })
+
+  nacl.addEntry(`PrivateSubnets${index}Egress`, {
+    cidr: ec2.AclCidr.ipv4(subnet.ipv4CidrBlock),
+    direction: ec2.TrafficDirection.EGRESS,
+    ruleNumber: 100 + index,
+    traffic: ec2.AclTraffic.allTraffic(),
+  })
+})
+```
+
+There are a few more params we want to specify on the main VPC construct to get everything setup
+correctly. We will need a NAT gateway that manages access to the internet for the VPC. Bear in
+mind this has a cost of $40 a month. We'll also set up a CIDR range for the VPC and give it two
+availability zones for redundancy in case one zone goes down.
+
+```typescript
+const vpc = new ec2.Vpc(this, 'MyApp-Vpc', {
+  ...
+  cidr: '10.0.0.0/16',
+  maxAzs: 2,
+  natGateways: 1,
+})
+```
+
+The last thing that we want to do is output the Vpc ID and CIDR to cloudformation and store it in the
+Systems Manager parameter store for easy access later.
+
+```typescript
+import * as ssm from '@aws-cdk/aws-ssm';
+
+...
+
+new cdk.CfnOutput(this, 'VpcId', {
+  description: 'VPC ID',
+  exportName: `vpc-id`,
+  value: vpc.vpcId,
+})
+
+new ssm.StringParameter(this, 'ssmVpcId', {
+  parameterName: `${ssmPrefix}/vpc/vpc-id`,
+  stringValue: vpc.vpcId,
+})
+
+
+new cdk.CfnOutput(this, 'VpcCidr', {
+  description: 'VPC CIDR',
+  exportName: `vpc-cidr`,
+  value: vpc.vpcCidrBlock,
+})
+
+new ssm.StringParameter(this, 'ssmVpcId', {
+  parameterName: `${ssmPrefix}/vpc/vpc-id`,
+  stringValue: vpc.vpcId,
+})
+```
+
+Here’s how this looks when it’s all put together. There are a few changes from the examples above
+to reuse some code.
+
+```typescript
+import * as cdk from '@aws-cdk/core'
+import * as ec2 from '@aws-cdk/aws-ec2'
+import * as ssm from '@aws-cdk/aws-ssm'
+
+export class MyAppVpcStack extends cdk.Stack {
+  constructor(scope: cdk.Construct, id: string, props: cdk.StackProps) {
+    super(scope, id, props)
+
+    const projectPrefix = 'development'
+    const ssmPrefix = `/myAppProject/${projectPrefix}/network`
+    const vpc = new ec2.Vpc(this, 'MyApp-Vpc', {
+      cidr: `10.0.0.0/16`,
+      maxAzs: 2,
+      natGateways: 1,
+      subnetConfiguration: [
+        {
+          cidrMask: 24,
+          name: 'Isolated',
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        },
+        {
+          cidrMask: 24,
+          name: 'Private',
+          subnetType: ec2.SubnetType.PRIVATE_WITH_NAT,
+        },
+        {
+          cidrMask: 28,
+          name: 'Public',
+          subnetType: ec2.SubnetType.PUBLIC,
+        },
+      ],
+    })
+
+    const privateSubnets = vpc.selectSubnets({
+      subnetType: ec2.SubnetType.PRIVATE_WITH_NAT,
+    })
+
+    const publicSubnets = vpc.selectSubnets({
+      subnetType: ec2.SubnetType.PUBLIC,
+    })
+
+    const isolatedSubnets = vpc.selectSubnets({
+      subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+    })
+
+    const nacl = new ec2.NetworkAcl(this, 'MyApp-NetworkAcl', {
+      vpc,
+      networkAclName: 'IsolatedSubnetNACL',
+      subnetSelection: isolatedSubnets,
+    })
+
+    privateSubnets.subnets.forEach((subnet, index) => {
+      nacl.addEntry(`PrivateSubnets${index}Ingress`, {
+        cidr: ec2.AclCidr.ipv4(subnet.ipv4CidrBlock),
+        direction: ec2.TrafficDirection.INGRESS,
+        ruleNumber: 100 + index,
+        traffic: ec2.AclTraffic.allTraffic(),
+      })
+
+      nacl.addEntry(`PrivateSubnets${index}Egress`, {
+        cidr: ec2.AclCidr.ipv4(subnet.ipv4CidrBlock),
+        direction: ec2.TrafficDirection.EGRESS,
+        ruleNumber: 100 + index,
+        traffic: ec2.AclTraffic.allTraffic(),
+      })
+    })
+
+    new cdk.CfnOutput(this, 'VpcId', {
+      description: 'VPC ID',
+      exportName: 'vpc-id',
+      value: vpc.vpcId,
+    })
+
+    new ssm.StringParameter(this, 'ssmVpcId', {
+      parameterName: `${ssmPrefix}/vpc/vpc-id`,
+      stringValue: vpc.vpcId,
+    })
+
+    new cdk.CfnOutput(this, 'VpcCidr', {
+      description: 'VPC CIDR',
+      exportName: `vpc-cidr`,
+      value: vpc.vpcCidrBlock,
+    })
+
+    new ssm.StringParameter(this, 'ssmVpcId', {
+      parameterName: `${ssmPrefix}/vpc/vpc-id`,
+      stringValue: vpc.vpcId,
+    })
+  }
+}
+```

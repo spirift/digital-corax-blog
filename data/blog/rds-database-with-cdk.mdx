@@ -1,0 +1,79 @@
+---
+title: RDS Database with CDK
+date: '2023-01-13'
+tags: ['aws', 'cdk', 'typescript', 'postgres', 'sql', 'infrastructure as code']
+draft: true
+summary: Let's take a look at how to setup a RDS database cluster in AWS using the CDK toolkit.
+images: []
+layout: PostLayout
+---
+
+# Let's make a database in AWS with CDK
+
+## The code
+
+```typescript
+import * as cdk from '@aws-cdk/core'
+import * as ec2 from '@aws-cdk/aws-ec2'
+import * as rds from '@aws-cdk/aws-rds'
+
+interface MyRdsStackProps extends cdk.StackProps {
+  vpc: ec2.IVpc
+  deploymentEnv: 'Dev' | 'Staging' | 'Production'
+}
+
+export class MyRdsStack extends cdk.Stack {
+  constructor(scope: cdk.Construct, id: string, props: MyRdsStackProps) {
+    super(scope, id, props)
+
+    const { vpc, deploymentEnv } = props
+
+    const databaseSecretArn = 'arn:aws:secretsmanager:eu-west-2:384687665863:secret'
+
+    const sg = new ec2.SecurityGroup(this, 'Database-Public-Access', {
+      allowAllOutbound: true,
+      description: 'Public access to the dev database for convenient access',
+      securityGroupName: 'Dev-DB-SG-Public',
+      vpc,
+    })
+    sg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(5432), 'Allow access from the world')
+
+    const dbInstance = new rds.DatabaseInstance(this, 'db-instance', {
+      vpc,
+      securityGroups: [sg],
+
+      subnetGroup: new rds.SubnetGroup(this, 'DevSubnetGroup', {
+        subnetGroupName: 'DevPostgres',
+        vpc,
+        description: 'Subnet Group for the Aurora Postgres Database',
+        vpcSubnets: {
+          subnetType: ec2.SubnetType.PUBLIC,
+        },
+      }),
+      engine: rds.DatabaseInstanceEngine.postgres({
+        version: rds.PostgresEngineVersion.VER_14_2, // latest as of 13-01-2023
+      }),
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MICRO),
+      instanceIdentifier: `Dev-DB`,
+      credentials: rds.Credentials.fromSecret(databaseSecret),
+      multiAz: false,
+      allocatedStorage: 20,
+      maxAllocatedStorage: 22,
+      allowMajorVersionUpgrade: false,
+      autoMinorVersionUpgrade: true,
+      backupRetention: cdk.Duration.days(0),
+      deleteAutomatedBackups: true,
+      removalPolicy: cdk.RemovalPolicy.SNAPSHOT,
+      deletionProtection: false,
+      databaseName: 'postgres',
+      publiclyAccessible: true,
+    })
+
+    cdk.Tags.of(dbInstance).add('Name', 'Dev-DB')
+
+    new cdk.CfnOutput(this, 'DevDBEndpoint', {
+      value: dbInstance.instanceEndpoint.hostname,
+    })
+  }
+}
+```

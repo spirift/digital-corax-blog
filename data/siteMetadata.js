@@ -10,12 +10,12 @@ const siteMetadata = {
   siteLogo: '/static/images/digital-corax-logo@3x.png',
   image: '/static/images/digital-corax-logo@3x.png',
   socialBanner: '/static/images/twitter-card.png',
-  email: 'address@yoursite.com',
+  // email: 'address@yoursite.com',
   github: 'https://github.com/spirift',
   // twitter: 'https://twitter.com/Twitter',
   // facebook: 'https://facebook.com',
   // youtube: 'https://youtube.com',
-  linkedin: 'https://www.linkedin.com',
+  linkedin: 'https://www.linkedin.com/in/michael-burson-he-him-a7a87222/',
   locale: 'en-GB',
   analytics: {
     // If you want to use an analytics provider you have to add it to the
