@@ -1,0 +1,26 @@
+---
+title: Up and running with CDK
+date: '2023-01-01'
+tags: ['aws', 'cdk', 'lambda', 's3', 'typescript']
+draft: true
+summary: The AWS Cloud Development Kit makes building infrastructure with code testable and repeatable. Let's see how we can get started with CDK by building a simple lambda that saves data into an S3 bucket.
+images: []
+layout: PostLayout
+---
+
+The AWS Cloud Development Kit makes building infrastructure with code testable and repeatable.
+Let's see how we can get started with CDK by building a simple lambda that saves data into an S3 bucket.
+We'll go over creating a new CDK project, creating a lambda function, s3 bucket and giving the lambda permission to create new file in the s3 bucket.
+You'll need an AWS account with an IAM user credentials setup in your terminal.
+
+## Using the CDK command line interface (CLI)
+
+To get the CDK code to become actual infrastructure you need to use the CDK CLI. The best way to do this with with `npx aws-cdk`,
+this ensures that we always use the correct version for the project we currently working on.
+I recommend setting up an alias for this, if you're using zsh (it's the default for macOS these days) you can run `zshconfig` to open your zsh config
+file and then just add a new line `alias cdk=npx aws-cdk`, you'll need to restart the terminal for this to take effect.
+
+## Create a new CDK project
+
+Inside an empty directory run the command `cdk init sample-app --language=typescript` in your terminal to create a new CDK app with typescript.
+This sample app comes with a few constructs in place as examples,
