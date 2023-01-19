@@ -19,6 +19,9 @@ export const getStaticProps = async () => {
 }
 
 export default function Home({ posts }: InferGetStaticPropsType<typeof getStaticProps>) {
+  const displayPostsWithoutDrafts =
+    process.env.NODE_ENV === 'development' ? posts : posts.filter(({ draft }) => !draft)
+
   return (
     <>
       <PageSEO title={siteMetadata.title} description={siteMetadata.description} />
@@ -32,8 +35,8 @@ export default function Home({ posts }: InferGetStaticPropsType<typeof getStatic
           </p>
         </div>
         <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-          {!posts.length && 'No posts found.'}
-          {posts.slice(0, MAX_DISPLAY).map((post) => {
+          {!displayPostsWithoutDrafts.length && 'No posts found.'}
+          {displayPostsWithoutDrafts.slice(0, MAX_DISPLAY).map((post) => {
             const { slug, date, title, summary, tags } = post
             return (
               <li key={slug} className="py-12">

@@ -47,7 +47,7 @@ export default function Blog({
 }: InferGetStaticPropsType<typeof getStaticProps>) {
   return (
     <>
-      {'draft' in post && post.draft !== true ? (
+      {process.env.NODE_ENV === 'development' || ('draft' in post && post.draft !== true) ? (
         <MDXLayoutRenderer
           layout={post.layout || DEFAULT_LAYOUT}
           toc={post.toc}

@@ -24,6 +24,8 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
   const displayPosts =
     initialDisplayPosts.length > 0 && !searchValue ? initialDisplayPosts : filteredBlogPosts
 
+  const displayPostsWithoutDrafts = displayPosts.filter(({ draft }) => !draft)
+
   return (
     <>
       <div className="divide-y">
@@ -56,8 +58,8 @@ export default function ListLayout({ posts, title, initialDisplayPosts = [], pag
           </div>
         </div>
         <ul>
-          {!filteredBlogPosts.length && 'No posts found.'}
-          {displayPosts.map((post) => {
+          {!displayPostsWithoutDrafts.length && 'No posts found.'}
+          {displayPostsWithoutDrafts.map((post) => {
             const { slug, date, title, summary, tags } = post
             return (
               <li key={slug} className="py-4">
